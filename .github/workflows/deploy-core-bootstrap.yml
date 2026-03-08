@@ -78,20 +78,25 @@ jobs:
           # The role ARN is computed based on the repository name
           # Pattern: arn:aws:iam::ACCOUNT_ID:role/github-OWNER-REPO_NAME
           # 
-          # AWS_ACCOUNT_ID is retrieved from organization secrets,
-          # set once and available to all repositories:
-          # gh secret set AWS_ACCOUNT_ID --org <org>
+          # AWS_ACCOUNT_ID can be set as:
+          # - Repository secret: gh secret set AWS_ACCOUNT_ID <account-id>
+          # - Organization secret: gh secret set AWS_ACCOUNT_ID --org <org>
           REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          AWS_ACCOUNT_ID="${{ secrets.AWS_ACCOUNT_ID }}"
           
-          if [ -z "${{ secrets.AWS_ACCOUNT_ID }}" ]; then
+          if [ -z "$AWS_ACCOUNT_ID" ]; then
             echo "❌ AWS_ACCOUNT_ID secret not set"
-            echo "   Set organization secret:"
-            echo "   gh secret set AWS_ACCOUNT_ID --org $REPO_OWNER"
+            echo ""
+            echo "Set it as a repository secret:"
+            echo "  gh secret set AWS_ACCOUNT_ID <account-id>"
+            echo ""
+            echo "OR set it at the organization level:"
+            echo "  gh secret set AWS_ACCOUNT_ID <account-id> --org $REPO_OWNER"
             exit 1
           fi
           
-          ROLE_ARN="arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-${REPO_OWNER}-${REPO_NAME}"
+          ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/github-${REPO_OWNER}-${REPO_NAME}"
           echo "role-arn=${ROLE_ARN}" >> $GITHUB_OUTPUT
           echo "✓ Role ARN computed: ${ROLE_ARN}"
 
