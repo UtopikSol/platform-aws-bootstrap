@@ -7,6 +7,7 @@ export interface GitHubRepoConfig {
   name: string;
   environments?: string[];
   branches?: string[];
+  permissions?: "bootstrap" | "full" | "deploy" | "read-only";
 }
 
 export interface GitHubRolesStackProps {
@@ -47,24 +48,11 @@ export class GitHubRolesStack extends Construct {
         description: `OIDC role for GitHub repository ${repo.owner}/${repo.name}`,
       });
 
-      // Add inline policy for basic assume role permissions
-      // This allows the workflow to assume other roles if needed
-      role.addToPrincipalPolicy(
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: ["sts:AssumeRole"],
-          resources: ["arn:aws:iam::*:role/github-*"],
-        }),
-      );
+      // Determine permissions level (default to "deploy" for safety)
+      const permissionLevel = repo.permissions || "deploy";
 
-      // Add SSM permissions for CDK bootstrap version check
-      role.addToPrincipalPolicy(
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: ["ssm:GetParameter"],
-          resources: ["arn:aws:ssm:*:*:parameter/cdk-bootstrap/*"],
-        }),
-      );
+      // Apply permissions based on level
+      this.applyPermissions(role, permissionLevel);
 
       // Store the role ARN
       this.roleArns[repo.name] = role.roleArn;
@@ -76,5 +64,242 @@ export class GitHubRolesStack extends Construct {
         exportName: `GitHubRoleArn-${repo.owner}-${repo.name}`,
       });
     });
+  }
+
+  /**
+   * Apply permissions to a role based on permission level
+   * Permission levels:
+   * - "bootstrap": Role/OIDC provider management (for infrastructure repos)
+   * - "full": All permissions (IAM, CloudFormation, S3, etc.)
+   * - "deploy": CloudFormation, S3, but no IAM changes
+   * - "read-only": Only read/describe operations
+   */
+  private applyPermissions(
+    role: iam.Role,
+    level: "bootstrap" | "full" | "deploy" | "read-only",
+  ): void {
+    // Common permissions for all levels
+    role.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["ssm:GetParameter"],
+        resources: ["arn:aws:ssm:*:*:parameter/cdk-bootstrap/*"],
+      }),
+    );
+
+    if (level === "bootstrap") {
+      // Bootstrap permissions: manage infrastructure, roles, and OIDC providers
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["sts:AssumeRole"],
+          resources: ["arn:aws:iam::*:role/github-*"],
+        }),
+      );
+
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "s3:GetObject",
+            "s3:PutObject",
+            "s3:DeleteObject",
+            "s3:ListBucket",
+          ],
+          resources: [
+            "arn:aws:s3:::cdk-hnb659fds-assets-*",
+            "arn:aws:s3:::cdk-hnb659fds-assets-*/*",
+          ],
+        }),
+      );
+
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "cloudformation:CreateStack",
+            "cloudformation:UpdateStack",
+            "cloudformation:DeleteStack",
+            "cloudformation:DescribeStacks",
+            "cloudformation:DescribeStackResource",
+            "cloudformation:DescribeStackResources",
+            "cloudformation:GetTemplate",
+            "cloudformation:ListStacks",
+          ],
+          resources: ["arn:aws:cloudformation:*:*:stack/*"],
+        }),
+      );
+
+      // Full IAM and OIDC provider management for infrastructure setup
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "iam:CreateRole",
+            "iam:UpdateRole",
+            "iam:DeleteRole",
+            "iam:GetRole",
+            "iam:ListRoles",
+            "iam:AttachRolePolicy",
+            "iam:DetachRolePolicy",
+            "iam:PutRolePolicy",
+            "iam:DeleteRolePolicy",
+            "iam:GetRolePolicy",
+            "iam:ListRolePolicies",
+            "iam:PassRole",
+            "iam:TagRole",
+            "iam:UntagRole",
+            "iam:CreateOpenIDConnectProvider",
+            "iam:UpdateOpenIDConnectProviderThumbprint",
+            "iam:AddClientIDToOpenIDConnectProvider",
+            "iam:RemoveClientIDFromOpenIDConnectProvider",
+            "iam:GetOpenIDConnectProvider",
+            "iam:DeleteOpenIDConnectProvider",
+            "iam:ListOpenIDConnectProviders",
+          ],
+          resources: [
+            "arn:aws:iam::*:role/*",
+            "arn:aws:iam::*:oidc-provider/*",
+          ],
+        }),
+      );
+    } else if (level === "full") {
+      // Full permissions: everything
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["sts:AssumeRole"],
+          resources: ["arn:aws:iam::*:role/github-*"],
+        }),
+      );
+
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "s3:GetObject",
+            "s3:PutObject",
+            "s3:DeleteObject",
+            "s3:ListBucket",
+          ],
+          resources: [
+            "arn:aws:s3:::cdk-hnb659fds-assets-*",
+            "arn:aws:s3:::cdk-hnb659fds-assets-*/*",
+          ],
+        }),
+      );
+
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "cloudformation:CreateStack",
+            "cloudformation:UpdateStack",
+            "cloudformation:DeleteStack",
+            "cloudformation:DescribeStacks",
+            "cloudformation:DescribeStackResource",
+            "cloudformation:DescribeStackResources",
+            "cloudformation:GetTemplate",
+            "cloudformation:ListStacks",
+          ],
+          resources: ["arn:aws:cloudformation:*:*:stack/*"],
+        }),
+      );
+
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "iam:CreateRole",
+            "iam:UpdateRole",
+            "iam:DeleteRole",
+            "iam:GetRole",
+            "iam:ListRoles",
+            "iam:AttachRolePolicy",
+            "iam:DetachRolePolicy",
+            "iam:PutRolePolicy",
+            "iam:DeleteRolePolicy",
+            "iam:GetRolePolicy",
+            "iam:ListRolePolicies",
+            "iam:PassRole",
+            "iam:CreateOpenIDConnectProvider",
+            "iam:UpdateOpenIDConnectProviderThumbprint",
+            "iam:GetOpenIDConnectProvider",
+            "iam:DeleteOpenIDConnectProvider",
+            "iam:ListOpenIDConnectProviders",
+          ],
+          resources: [
+            "arn:aws:iam::*:role/*",
+            "arn:aws:iam::*:oidc-provider/*",
+          ],
+        }),
+      );
+    } else if (level === "deploy") {
+      // Deploy permissions: CloudFormation, S3, but no IAM
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "s3:GetObject",
+            "s3:PutObject",
+            "s3:DeleteObject",
+            "s3:ListBucket",
+          ],
+          resources: [
+            "arn:aws:s3:::cdk-hnb659fds-assets-*",
+            "arn:aws:s3:::cdk-hnb659fds-assets-*/*",
+          ],
+        }),
+      );
+
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "cloudformation:CreateStack",
+            "cloudformation:UpdateStack",
+            "cloudformation:DeleteStack",
+            "cloudformation:DescribeStacks",
+            "cloudformation:DescribeStackResource",
+            "cloudformation:DescribeStackResources",
+            "cloudformation:GetTemplate",
+            "cloudformation:ListStacks",
+          ],
+          resources: ["arn:aws:cloudformation:*:*:stack/*"],
+        }),
+      );
+
+      // Allow passing existing roles but not creating new ones
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["iam:PassRole", "iam:GetRole"],
+          resources: ["arn:aws:iam::*:role/*"],
+        }),
+      );
+    } else if (level === "read-only") {
+      // Read-only permissions: describe and list operations only
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "s3:GetObject",
+            "s3:ListBucket",
+            "cloudformation:DescribeStacks",
+            "cloudformation:DescribeStackResource",
+            "cloudformation:DescribeStackResources",
+            "cloudformation:GetTemplate",
+            "cloudformation:ListStacks",
+            "logs:DescribeLogGroups",
+            "logs:DescribeLogStreams",
+            "logs:GetLogEvents",
+            "cloudwatch:DescribeAlarms",
+            "cloudwatch:ListMetrics",
+            "cloudwatch:GetMetricStatistics",
+          ],
+          resources: ["*"],
+        }),
+      );
+    }
   }
 }

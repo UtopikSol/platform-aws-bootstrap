@@ -2,7 +2,8 @@
   "githubOwner": "UtopikSol",
   "repositories": [
     {
-      "name": "platform-aws-core-bootstrap"
+      "name": "platform-aws-core-bootstrap",
+      "permissions": "bootstrap"
     }
   ]
 }

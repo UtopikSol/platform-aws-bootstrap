@@ -1,74 +1,114 @@
+/**
+ * Repository Configuration Example
+ * 
+ * PERMISSIONS LEVELS:
+ * - "bootstrap" : Infrastructure/bootstrap management (create roles, OIDC, etc.)
+ *                 Use for: platform-aws-core-bootstrap, bootstrap infrastructure repos
+ * - "full"      : All AWS/Azure permissions (IAM, CloudFormation, S3, etc.)
+ *                 Use for: comprehensive infrastructure management repos
+ * - "deploy"    : CloudFormation, S3, Lambda, RDS, etc. (no IAM creation)
+ *                 Use for: application deployment repos
+ * - "read-only" : CloudWatch, Logs, describe operations (no modifications)
+ *                 Use for: monitoring, reporting, analysis repos
+ * 
+ * NOTE: Permission levels are configured in this file and enforced in github-roles-stack.ts
+ *       Each repository gets an IAM role with permissions matching its level.
+ */
 {
   "githubOwner": "UtopikSol",
   "repositories": [
     {
-      "name": "platform-aws-lza-config"
+      "name": "platform-aws-lza-config",
+      "permissions": "bootstrap"
     },
     {
-      "name": "platform-aws-aft-account-requests"
+      "name": "platform-aws-aft-account-requests",
+      "permissions": "deploy"
     },
     {
-      "name": "platform-aws-aft-account-customizations"
+      "name": "platform-aws-aft-account-customizations",
+      "permissions": "deploy"
     },
     {
-      "name": "platform-aws-aft-provisioning"
+      "name": "platform-aws-aft-provisioning",
+      "permissions": "bootstrap"
     },
     {
-      "name": "platform-aws-tf-modules"
+      "name": "platform-aws-tf-modules",
+      "permissions": "deploy"
     },
     {
-      "name": "infra-aws-shared-network"
+      "name": "infra-aws-shared-network",
+      "permissions": "deploy"
     },
     {
-      "name": "infra-aws-eks-platform"
+      "name": "infra-aws-eks-platform",
+      "permissions": "deploy"
     },
     {
-      "name": "infra-aws-app-erp"
+      "name": "infra-aws-app-erp",
+      "permissions": "deploy"
     },
     {
-      "name": "infra-aws-app-crm"
+      "name": "infra-aws-app-crm",
+      "permissions": "deploy"
     },
     {
-      "name": "platform-azure-landingzone"
+      "name": "platform-azure-landingzone",
+      "permissions": "bootstrap"
     },
     {
-      "name": "platform-azure-policy"
+      "name": "platform-azure-policy",
+      "permissions": "deploy"
     },
     {
-      "name": "platform-azure-management"
+      "name": "platform-azure-management",
+      "permissions": "bootstrap"
     },
     {
-      "name": "platform-azure-tf-modules"
+      "name": "platform-azure-tf-modules",
+      "permissions": "deploy"
     },
     {
-      "name": "infra-azure-shared-network"
+      "name": "infra-azure-shared-network",
+      "permissions": "deploy"
     },
     {
-      "name": "infra-azure-aks-platform"
+      "name": "infra-azure-aks-platform",
+      "permissions": "deploy"
     },
     {
-      "name": "infra-azure-app-erp"
+      "name": "infra-azure-app-erp",
+      "permissions": "deploy"
     },
     {
-      "name": "tools-ci-templates"
+      "name": "tools-ci-templates",
+      "permissions": "read-only"
     },
     {
-      "name": "tools-terraform-linters"
+      "name": "tools-terraform-linters",
+      "permissions": "read-only"
     },
     {
-      "name": "tools-security-policies"
+      "name": "tools-security-policies",
+      "permissions": "read-only"
     },
     {
-      "name": "automation-cloud-reports"
+      "name": "automation-cloud-reports",
+      "permissions": "read-only"
     },
     {
-      "name": "app-identity-service"
+      "name": "app-identity-service",
+      "permissions": "deploy"
     },
     {
-      "name": "app-erp-api"
+      "name": "app-erp-api",
+      "permissions": "deploy"
     },
     {
-      "name": "app-erp-frontend"
+      "name": "app-erp-frontend",
+      "permissions": "deploy"
     }
   ]
 }
+
