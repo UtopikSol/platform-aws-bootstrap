@@ -57,6 +57,15 @@ export class GitHubRolesStack extends Construct {
         }),
       );
 
+      // Add SSM permissions for CDK bootstrap version check
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["ssm:GetParameter"],
+          resources: ["arn:aws:ssm:*:*:parameter/cdk-bootstrap/*"],
+        }),
+      );
+
       // Store the role ARN
       this.roleArns[repo.name] = role.roleArn;
 

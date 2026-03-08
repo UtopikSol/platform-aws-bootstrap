@@ -123,6 +123,8 @@ echo ""
 echo "========================================"
 echo "Deploying CDK Stack"
 echo "========================================"
+export CDK_DEFAULT_ACCOUNT=$ACCOUNT_ID
+export CDK_DEFAULT_REGION=$REGION
 npx cdk deploy --require-approval=never
 DEPLOY_EXIT_CODE=$?
 
