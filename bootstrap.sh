@@ -99,6 +99,70 @@ fi
 
 echo ""
 echo "========================================"
+echo "Configuring S3 Bucket Permissions"
+echo "========================================"
+ASSETS_BUCKET="cdk-hnb659fds-assets-$ACCOUNT_ID-$REGION"
+
+# Create a temporary policy file
+POLICY_FILE=$(mktemp)
+
+# Get the existing bucket policy or create a new one
+EXISTING_POLICY=$(aws s3api get-bucket-policy --bucket "$ASSETS_BUCKET" --region "$REGION" 2>/dev/null)
+
+if [ $? -eq 0 ]; then
+    # Policy exists, we'll add to it
+    echo "$EXISTING_POLICY" > "$POLICY_FILE"
+else
+    # No policy exists, create a new one
+    cat > "$POLICY_FILE" << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": []
+}
+EOF
+fi
+
+# Add S3 access statement for GitHub roles (will be created after deployment)
+# This statement uses a wildcard for all github-* roles in the account
+cat >> "$POLICY_FILE.new" << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowGitHubRoleCDKAssetAccess",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::$ACCOUNT_ID:role/github-*"
+      },
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket",
+        "s3:GetObjectVersion"
+      ],
+      "Resource": [
+        "arn:aws:s3:::$ASSETS_BUCKET",
+        "arn:aws:s3:::$ASSETS_BUCKET/*"
+      ]
+    }
+  ]
+}
+EOF
+
+# Apply the new policy
+aws s3api put-bucket-policy --bucket "$ASSETS_BUCKET" --policy file://"$POLICY_FILE.new" --region "$REGION"
+if [ $? -eq 0 ]; then
+    echo "✓ S3 bucket policy updated for GitHub roles"
+else
+    echo "⚠️  Failed to update bucket policy (may already be set)"
+fi
+
+# Cleanup temp files
+rm -f "$POLICY_FILE" "$POLICY_FILE.new"
+echo ""
+
+echo "========================================"
 echo "Installing Project Dependencies"
 echo "========================================"
 npm install
