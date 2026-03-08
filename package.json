@@ -1,0 +1,22 @@
+{
+  "name": "platform-aws-core-bootstrap",
+  "version": "1.0.0",
+  "description": "GitHub OIDC and IAM role setup for AWS CDK",
+  "main": "app.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "destroy": "cdk destroy"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "~5.3.3"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.0.0",
+    "constructs": "^10.0.0"
+  }
+}

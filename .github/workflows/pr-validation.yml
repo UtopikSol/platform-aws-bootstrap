@@ -1,0 +1,47 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'lib/**'
+      - 'bin/**'
+      - 'package.json'
+      - 'tsconfig.json'
+      - 'cdk.json'
+      - 'repositories.json'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install CDK CLI
+        run: npm install -g aws-cdk
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Lint TypeScript
+        run: npx eslint lib/ bin/ --ext .ts || true
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Validate CDK Synthesis
+        run: npx cdk synth
+
+      - name: Check repositories.json
+        run: |
+          if [ -f repositories.json ]; then
+            jq . repositories.json > /dev/null && echo "✓ repositories.json is valid JSON"
+          fi

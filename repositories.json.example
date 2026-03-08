@@ -1,0 +1,74 @@
+{
+  "githubOwner": "UtopikSol",
+  "repositories": [
+    {
+      "name": "platform-aws-lza-config"
+    },
+    {
+      "name": "platform-aws-aft-account-requests"
+    },
+    {
+      "name": "platform-aws-aft-account-customizations"
+    },
+    {
+      "name": "platform-aws-aft-provisioning"
+    },
+    {
+      "name": "platform-aws-tf-modules"
+    },
+    {
+      "name": "infra-aws-shared-network"
+    },
+    {
+      "name": "infra-aws-eks-platform"
+    },
+    {
+      "name": "infra-aws-app-erp"
+    },
+    {
+      "name": "infra-aws-app-crm"
+    },
+    {
+      "name": "platform-azure-landingzone"
+    },
+    {
+      "name": "platform-azure-policy"
+    },
+    {
+      "name": "platform-azure-management"
+    },
+    {
+      "name": "platform-azure-tf-modules"
+    },
+    {
+      "name": "infra-azure-shared-network"
+    },
+    {
+      "name": "infra-azure-aks-platform"
+    },
+    {
+      "name": "infra-azure-app-erp"
+    },
+    {
+      "name": "tools-ci-templates"
+    },
+    {
+      "name": "tools-terraform-linters"
+    },
+    {
+      "name": "tools-security-policies"
+    },
+    {
+      "name": "automation-cloud-reports"
+    },
+    {
+      "name": "app-identity-service"
+    },
+    {
+      "name": "app-erp-api"
+    },
+    {
+      "name": "app-erp-frontend"
+    }
+  ]
+}

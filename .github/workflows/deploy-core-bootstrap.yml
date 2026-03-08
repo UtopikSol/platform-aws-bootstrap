@@ -1,0 +1,68 @@
+name: Deploy Core Bootstrap Stack
+
+# This workflow is for updating the bootstrap stack after initial deployment
+# For the FIRST deployment, run manually: npx cdk deploy
+# This workflow runs on subsequent updates to repositories.json or CDK code
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lib/**'
+      - 'bin/**'
+      - 'package.json'
+      - 'tsconfig.json'
+      - 'cdk.json'
+      - 'repositories.json'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install CDK CLI
+        run: npm install -g aws-cdk
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: us-east-1
+
+      - name: Synth CDK
+        run: npx cdk synth
+
+      - name: Deploy CDK Stack
+        run: npx cdk deploy --require-approval=never
+
+      - name: Set GitHub Secrets in All Repos
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ORG=$(jq -r '.githubOwner' repositories.json)
+          chmod +x set-github-secrets.sh
+          ./set-github-secrets.sh "$ORG" "$ACCOUNT_ID"
+
+      - name: Display Stack Outputs
+        run: |
+          echo "Stack deployed successfully!"
+          aws cloudformation describe-stacks --stack-name CoreBootstrapStack --query 'Stacks[0].Outputs' --output table || true

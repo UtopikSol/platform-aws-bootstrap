@@ -1,0 +1,24 @@
+# Parcel related files
+dist
+.cache
+
+# Build
+*.d.ts
+*.js
+*.js.map
+
+# CDK
+cdk.out/
+*.metadata.json
+
+# Misc
+node_modules/
+.idea/
+*.swp
+*.swo
+*~
+.env
+.env.local
+
+# Environment-specific config (optional - uncomment to ignore)
+# repositories.*.json
