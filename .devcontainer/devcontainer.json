@@ -2,7 +2,8 @@
   "name": "AWS CDK Bootstrap",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:20",
   "features": {
-    "ghcr.io/devcontainers/features/aws-cli:1": {}
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "postCreateCommand": "npm install && npm install -g aws-cdk",
   "customizations": {

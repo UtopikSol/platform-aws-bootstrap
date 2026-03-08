@@ -17,7 +17,41 @@ on:
   workflow_dispatch:
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install CDK CLI
+        run: npm install -g aws-cdk
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Lint TypeScript
+        run: npx eslint lib/ bin/ --ext .ts || true
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Validate CDK Synthesis
+        run: npx cdk synth
+
+      - name: Check repositories.json
+        run: |
+          if [ -f repositories.json ]; then
+            jq . repositories.json > /dev/null && echo "✓ repositories.json is valid JSON"
+          fi
+
   deploy:
+    needs: validate
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -38,13 +72,33 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build TypeScript
-        run: npm run build
+      - name: Compute Role ARN
+        id: role-arn
+        run: |
+          # The role ARN is computed based on the repository name
+          # Pattern: arn:aws:iam::ACCOUNT_ID:role/github-OWNER-REPO_NAME
+          # 
+          # AWS_ACCOUNT_ID is retrieved from organization secrets,
+          # set once and available to all repositories:
+          # gh secret set AWS_ACCOUNT_ID --org <org>
+          REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          
+          if [ -z "${{ secrets.AWS_ACCOUNT_ID }}" ]; then
+            echo "❌ AWS_ACCOUNT_ID secret not set"
+            echo "   Set organization secret:"
+            echo "   gh secret set AWS_ACCOUNT_ID --org $REPO_OWNER"
+            exit 1
+          fi
+          
+          ROLE_ARN="arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-${REPO_OWNER}-${REPO_NAME}"
+          echo "role-arn=${ROLE_ARN}" >> $GITHUB_OUTPUT
+          echo "✓ Role ARN computed: ${ROLE_ARN}"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-to-assume: ${{ steps.role-arn.outputs.role-arn }}
           aws-region: ca-central-1
 
       - name: Synth CDK
@@ -53,16 +107,26 @@ jobs:
       - name: Deploy CDK Stack
         run: npx cdk deploy --require-approval=never
 
-      - name: Set GitHub Secrets in All Repos
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Display Stack Outputs and Role ARNs
         run: |
+          echo "========================================"
+          echo "✓ Bootstrap Stack Deployed Successfully"
+          echo "========================================"
+          echo ""
+          aws cloudformation describe-stacks --stack-name CoreBootstrapStack --query 'Stacks[0].Outputs' --output table || true
+          echo ""
+          echo "========================================"
+          echo "GitHub OIDC Roles Created"
+          echo "========================================"
+          echo ""
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           ORG=$(jq -r '.githubOwner' repositories.json)
-          chmod +x set-github-secrets.sh
-          ./set-github-secrets.sh "$ORG" "$ACCOUNT_ID"
-
-      - name: Display Stack Outputs
-        run: |
-          echo "Stack deployed successfully!"
-          aws cloudformation describe-stacks --stack-name CoreBootstrapStack --query 'Stacks[0].Outputs' --output table || true
+          echo "Account ID: $ACCOUNT_ID"
+          echo "Organization: $ORG"
+          echo ""
+          echo "Role ARN pattern: arn:aws:iam::${ACCOUNT_ID}:role/github-${ORG}-{REPO_NAME}"
+          echo ""
+          echo "Repository roles:"
+          jq -r '.repositories[].name' repositories.json | while read REPO; do
+            echo "  - github-${ORG}-${REPO}"
+          done

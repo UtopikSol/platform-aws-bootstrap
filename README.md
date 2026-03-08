@@ -44,149 +44,161 @@ GitHub Actions Workflow
 
 ## Prerequisites
 
-- AWS Account (this repo will set up the GitHub OIDC provider and IAM roles)
-- AWS CLI configured with credentials to deploy CDK
+- AWS Account with appropriate permissions
+- AWS CLI configured with credentials
 - Node.js 18+ and npm
-- AWS CDK CLI (`npm install -g aws-cdk`)
+- GitHub CLI (`gh`) for setting organization secrets
+- Personal GitHub account with organization owner role (for setting secrets)
 
-## Configuration
+## Quick Start
 
-### Repository Configuration
+### Development Environment
 
-The list of repositories is managed in [repositories.json](repositories.json). This JSON file contains:
+This project includes a `.devcontainer` configuration for VS Code. To use it:
 
-- `githubOwner`: Default GitHub organization name
-- `repositories`: Array of repository configurations
+1. Install [VS Code Remote - Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+2. Open the workspace in VS Code
+3. Click "Reopen in Container" when prompted
+4. All dependencies will be automatically installed
 
-#### Editing repositories.json
+### Initial Setup (First Time Only)
 
-To add, remove, or modify repositories, edit `repositories.json`:
+#### 1. Configure AWS Credentials
+
+```bash
+aws configure
+# Enter your AWS Access Key ID and Secret Access Key
+```
+
+#### 2. Update repositories.json
+
+Edit [repositories.json](repositories.json) with your repositories and desired permission levels:
 
 ```json
 {
-  "githubOwner": "your-org",
+  "githubOwner": "UtopikSol",
   "repositories": [
     {
-      "name": "repository-name",
-      "environments": ["prod"]
+      "name": "platform-aws-core-bootstrap",
+      "permissions": "bootstrap"
+    },
+    {
+      "name": "app-api",
+      "permissions": "deploy"
     }
   ]
 }
 ```
 
-#### Environment Variable Override
+**Permission Levels:**
+- `bootstrap` - Infrastructure/bootstrap management (create roles, OIDC providers)
+- `full` - All AWS permissions (IAM, CloudFormation, S3, etc.)
+- `deploy` - Application deployment (CloudFormation, S3, no IAM creation)
+- `read-only` - Monitor and report (CloudWatch, Logs, no modifications)
 
-You can override the GitHub organization without editing the file:
+#### 3. Run Bootstrap Script
 
 ```bash
-export GITHUB_ORG=my-org
-npx cdk deploy
+./bootstrap.sh
 ```
 
-## Setup Instructions
+This script will:
+- ✓ Verify AWS credentials
+- ✓ Bootstrap the AWS environment (CDK Toolkit)
+- ✓ Install dependencies
+- ✓ Deploy the bootstrap stack
+- ✓ Create GitHub OIDC provider and IAM roles
 
-### Initial Bootstrap (Manual Deployment)
+#### 4. Set Organization Secret
 
-The first deployment must be done manually since the OIDC roles don't exist yet.
+Authenticate with GitHub and set the organization secret:
 
-#### 1. Update Organization Name
+```bash
+gh auth login
+# Authenticate with your GitHub account (requires org owner role)
 
-Edit [repositories.json](repositories.json) and set your GitHub organization:
+./set-github-secrets.sh 271003693931
+# Replace with your actual AWS Account ID
+```
+
+This sets `AWS_ACCOUNT_ID` as an organization secret, available to all repositories.
+
+### Automated Updates (GitHub Actions)
+
+After initial setup, updates are fully automated:
+
+1. **Modify repositories.json** - Add/remove repositories or change permissions
+2. **Create a Pull Request** - GitHub Actions automatically validates with PR validation workflow
+3. **Merge to main** - Deploy workflow automatically runs when merged
+   - Creates/updates IAM roles for all repositories
+   - Displays stack outputs
+
+
+
+## Configuration
+
+### Repository Configuration
+
+Edit [repositories.json](repositories.json) to manage repositories and their permissions:
 
 ```json
 {
-  "githubOwner": "your-actual-org"
+  "githubOwner": "UtopikSol",
+  "repositories": [
+    {
+      "name": "repository-name",
+      "permissions": "deploy"
+    }
+  ]
 }
 ```
 
-#### 2. Install Dependencies
+### Permission Levels Reference
 
-```bash
-npm install
+| Level | Use Case | Permissions |
+|-------|----------|---|
+| `bootstrap` | Infrastructure management, bootstrap repos | Full IAM, CloudFormation, S3, OIDC provider management |
+| `full` | Comprehensive infrastructure repos | All AWS permissions |
+| `deploy` | Application deployment repos | CloudFormation, S3, can pass existing IAM roles |
+| `read-only` | Monitoring, reporting, analysis | CloudWatch, Logs, describe operations only |
+
+## Understanding the Architecture
+
+### How It Works
+
+1. **GitHub OIDC Provider** - AWS trusts GitHub's OpenID provider
+2. **Repository-Specific Roles** - Each repo gets its own IAM role
+3. **Dynamic Role ARN Computation** - Workflows compute role ARN from repo name and account ID
+4. **No Long-Lived Credentials** - Uses short-lived OIDC tokens
+
+### Role Naming Convention
+
+```
+arn:aws:iam::ACCOUNT_ID:role/github-OWNER-REPO_NAME
 ```
 
-#### 3. Build TypeScript
+Example: `arn:aws:iam::271003693931:role/github-UtopikSol-platform-aws-core-bootstrap`
 
-```bash
-npm run build
+## Project Structure
+
 ```
-
-#### 4. Review the Stack
-
-```bash
-npx cdk synth
-```
-
-#### 5. Deploy Bootstrap Stack (Manual)
-
-Configure AWS credentials and deploy:
-
-```bash
-# Configure with your AWS management account credentials
-aws configure
-
-# Deploy the bootstrap stack
-npx cdk deploy
-```
-
-The CDK will create:
-1. GitHub OIDC Provider
-2. IAM roles for each repository (including one for this bootstrap repo)
-
-#### 6. Set Secret in This Repository
-
-After bootstrap deployment completes, the role ARN for this repo is displayed. Store it as a secret:
-
-1. Go to this repo → Settings → Secrets and variables → Actions
-2. Create secret `AWS_ROLE_TO_ASSUME` with the bootstrap role ARN
-   - Format: `arn:aws:iam::ACCOUNT:role/github-your-org-platform-aws-core-bootstrap`
-
-#### 7. Update Bootstrap Role Permissions
-
-Add CDK deployment permissions to the bootstrap role in [lib/github-roles-stack.ts](lib/github-roles-stack.ts):
-
-```typescript
-// Find the platform-aws-core-bootstrap role and add permissions
-if (repo.name === 'platform-aws-core-bootstrap') {
-  role.addInlinePolicy(
-    new iam.Policy(this, `BootstrapDeployPolicy`, {
-      statements: [
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: [
-            'cloudformation:*',
-            'iam:*',
-            'sts:*',
-          ],
-          resources: ['*'],
-        }),
-      ],
-    })
-  );
-}
-```
-
-Then redeploy: `npx cdk deploy`
-
-### Future Updates (GitHub Actions Automated)
-
-After initial setup, future updates are automated:
-
-1. **Add new repositories**: Update [repositories.json](repositories.json)
-2. **Push to main branch**: GitHub Actions automatically:
-   - Deploys CDK changes
-   - Creates roles for new repositories
-   - Sets `AWS_ROLE_TO_ASSUME` secrets in all repositories (new and existing)
-
-No manual steps needed! The workflow:
-- Uses this repo's OIDC role to deploy
-- Runs the secret-setting script automatically after CDK deploy
-- Sets secrets in all repos defined in `repositories.json`
-
-For manual deployments:
-```bash
-npx cdk deploy
-./set-github-secrets.sh your-org 123456789012
+├── bin/
+│   └── app.ts                    # CDK app entry point
+├── lib/
+│   ├── github-oidc-stack.ts      # OIDC provider configuration
+│   ├── github-roles-stack.ts     # Repository-specific role definitions
+│   └── core-bootstrap-stack.ts   # Stack composition and orchestration
+├── .devcontainer/
+│   └── devcontainer.json         # Dev container configuration
+├── .github/workflows/
+│   ├── deploy-core-bootstrap.yml # Automated deployment workflow
+│   └── pr-validation.yml         # PR validation checks
+├── .gitattributes
+├── bootstrap.sh                  # One-step bootstrap script
+├── set-github-secrets.sh         # Sets organization secrets
+├── package.json                  # Dependencies
+├── tsconfig.json                 # TypeScript configuration
+└── cdk.json                      # CDK configuration
 ```
 
 ## Managed Repositories
@@ -276,18 +288,129 @@ role.addInlinePolicy(
 
 Edit the role definitions in [lib/github-roles-stack.ts](lib/github-roles-stack.ts) to add permissions specific to each repository.
 
-## GitHub OIDC Trust Policy
+## Troubleshooting
 
-The roles trust the GitHub OIDC provider with the following conditions:
+### AWS Credentials Not Found
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Federated": "arn:aws:iam::ACCOUNT:oidc-provider/token.actions.githubusercontent.com"
+**Error:** `Unable to locate credentials. You can configure credentials by running 'aws login'.`
+
+**Solution:** Configure AWS credentials using:
+```bash
+aws configure
+```
+
+### Bootstrap Failed - SSM Parameter Not Found
+
+**Error:** `SSM parameter /cdk-bootstrap/hnb659fds/version not found`
+
+**Solution:** This means AWS CDK hasn't bootstrapped the environment yet. Run:
+```bash
+./bootstrap.sh
+```
+
+It handles all bootstrap steps automatically.
+
+### GitHub Secret Not Set
+
+**Error:** `AWS_ACCOUNT_ID secret not set`
+
+**Solution:** Set the organization secret:
+```bash
+gh auth login
+./set-github-secrets.sh 271003693931
+```
+
+### Permissions Denied on Secret Setup
+
+**Error:** `HTTP 403: Resource not accessible`
+
+**Solution:** Your GitHub account needs to be an organization owner. Contact your organization admin.
+
+## Common Workflows
+
+### Add a New Repository
+
+1. Edit `repositories.json`:
+   ```json
+   {
+     "name": "my-new-repo",
+     "permissions": "deploy"
+   }
+   ```
+
+2. Commit and push to main:
+   ```bash
+   git add repositories.json
+   git commit -m "Add my-new-repo"
+   git push origin main
+   ```
+
+3. GitHub Actions automatically:
+   - Creates the IAM role `github-UtopikSol-my-new-repo`
+   - Makes it assume-able by the `my-new-repo` repository
+
+### Change a Repository's Permissions
+
+1. Edit `repositories.json` and change the `permissions` field
+2. Commit and push - GitHub Actions updates the role permissions automatically
+
+### Deploy Manually Without GitHub Actions
+
+```bash
+# Update repositories.json first
+nano repositories.json
+
+# Then deploy
+npm run build
+npx cdk deploy --require-approval=never
+```
+
+### Verify Role Creation
+
+```bash
+AWS_REGION=ca-central-1 aws iam list-roles | grep github-
+```
+
+## Security Best Practices
+
+1. **Least Privilege** - Assign only the minimum permissions each repo needs
+2. **Audit Changes** - Review all `repositories.json` changes before merge
+3. **Monitor Usage** - Check CloudTrail for OIDC role usage
+4. **Rotate Secrets** - Use short-lived OIDC tokens (15 minutes default)
+5. **Limit Scope** - Roles are scoped to specific repositories via OIDC conditions
+
+## Development
+
+### Building the Project
+
+```bash
+npm run build
+```
+
+### Type Checking
+
+```bash
+npm run build
+```
+
+### Synthesizing CDK
+
+```bash
+npx cdk synth
+```
+
+### Running Tests
+
+```bash
+npm test
+```
+
+## Support
+
+For issues or questions:
+1. Check the [Troubleshooting](#troubleshooting) section
+2. Review [AWS CDK documentation](https://docs.aws.amazon.com/cdk/)
+3. Check [GitHub OIDC documentation](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect)
       },
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
