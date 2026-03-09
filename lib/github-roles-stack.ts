@@ -163,6 +163,24 @@ export class GitHubRolesStack extends Construct {
           ],
         }),
       );
+
+      // SSM Parameter Store permissions for configuration management
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "ssm:GetParameter",
+            "ssm:GetParameters",
+            "ssm:PutParameter",
+            "ssm:DeleteParameter",
+            "ssm:DescribeParameters",
+          ],
+          resources: [
+            "arn:aws:ssm:*:*:parameter/cdk-bootstrap/*",
+            "arn:aws:ssm:*:*:parameter/utopiksol/*",
+          ],
+        }),
+      );
     } else if (level === "full") {
       // Full permissions: everything
       role.addToPrincipalPolicy(
@@ -234,6 +252,21 @@ export class GitHubRolesStack extends Construct {
           ],
         }),
       );
+
+      // SSM Parameter Store permissions for configuration management
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "ssm:GetParameter",
+            "ssm:GetParameters",
+            "ssm:PutParameter",
+            "ssm:DeleteParameter",
+            "ssm:DescribeParameters",
+          ],
+          resources: ["arn:aws:ssm:*:*:parameter/*"],
+        }),
+      );
     } else if (level === "deploy") {
       // Deploy permissions: CloudFormation, S3, but no IAM
       role.addToPrincipalPolicy(
@@ -275,6 +308,20 @@ export class GitHubRolesStack extends Construct {
           effect: iam.Effect.ALLOW,
           actions: ["iam:PassRole", "iam:GetRole"],
           resources: ["arn:aws:iam::*:role/*"],
+        }),
+      );
+
+      // SSM Parameter Store permissions for reading/writing configuration
+      role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            "ssm:GetParameter",
+            "ssm:GetParameters",
+            "ssm:PutParameter",
+            "ssm:DescribeParameters",
+          ],
+          resources: ["arn:aws:ssm:*:*:parameter/*"],
         }),
       );
     } else if (level === "read-only") {
