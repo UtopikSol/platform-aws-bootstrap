@@ -14,6 +14,12 @@ on:
       - 'tsconfig.json'
       - 'cdk.json'
       - 'repositories.json'
+  manual:
+    inputs:
+      reason:
+        description: 'Reason for manual deployment'
+        required: true
+        default: 'Manual deployment triggered from GitHub Actions UI'
   workflow_dispatch:
 
 jobs:
