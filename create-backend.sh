@@ -6,7 +6,8 @@
 # Example: ./create-backend.sh (auto-detect from SSO)
 # Example: ./create-backend.sh 198252713378 ca-central-1 (override defaults)
 
-set -e
+# Note: We don't use 'set -e' to allow backend.hcl creation even if some AWS operations fail
+# We'll handle errors explicitly for critical operations
 
 # Parse arguments (optional - will auto-detect if not provided)
 ACCOUNT_ID="${1:-}"
@@ -43,7 +44,7 @@ if ! [[ "$ACCOUNT_ID" =~ ^[0-9]{12}$ ]]; then
 fi
 
 # Define bucket name
-RANDOM_SUFFIX=$(openssl rand -hex 5)
+RANDOM_SUFFIX=$(aws sso-admin list-instances --query "Instances[0].IdentityStoreId" --output text 2>/dev/null | tr -d '-')
 BUCKET_NAME="${BUCKET_PREFIX}-terraform-state-${RANDOM_SUFFIX}-${REGION}"
 
 echo "Creating Terraform backend resources..."
@@ -53,31 +54,32 @@ echo ""
 
 # Create S3 bucket
 echo "Creating S3 bucket..."
+BUCKET_EXISTS=false
 if aws s3 ls "s3://$BUCKET_NAME" 2>/dev/null; then
     echo "✓ Bucket already exists: $BUCKET_NAME"
+    BUCKET_EXISTS=true
 else
+    echo "Bucket does not exist. Attempting to create..."
     if [ "$REGION" = "us-east-1" ]; then
         aws s3api create-bucket \
             --bucket "$BUCKET_NAME" \
-            --region "$REGION"
+            --region "$REGION" 2>/dev/null && echo "✓ Created bucket: $BUCKET_NAME" || echo "✗ Failed to create bucket"
     else
         aws s3api create-bucket \
             --bucket "$BUCKET_NAME" \
             --region "$REGION" \
-            --create-bucket-configuration LocationConstraint="$REGION"
+            --create-bucket-configuration LocationConstraint="$REGION" 2>/dev/null && echo "✓ Created bucket: $BUCKET_NAME" || echo "✗ Failed to create bucket"
     fi
-    echo "✓ Created bucket: $BUCKET_NAME"
 fi
 
-# Enable versioning on S3 bucket
+# Enable versioning on S3 bucket (non-critical)
 echo "Enabling versioning on S3 bucket..."
 aws s3api put-bucket-versioning \
     --bucket "$BUCKET_NAME" \
     --region "$REGION" \
-    --versioning-configuration Status=Enabled
-echo "✓ Versioning enabled"
+    --versioning-configuration Status=Enabled 2>/dev/null && echo "✓ Versioning enabled" || echo "✗ Failed to enable versioning"
 
-# Enable default encryption on S3 bucket
+# Enable default encryption on S3 bucket (non-critical)
 echo "Enabling server-side encryption on S3 bucket..."
 aws s3api put-bucket-encryption \
     --bucket "$BUCKET_NAME" \
@@ -88,8 +90,7 @@ aws s3api put-bucket-encryption \
                 "SSEAlgorithm": "AES256"
             }
         }]
-    }'
-echo "✓ Default encryption enabled"
+    }' 2>/dev/null && echo "✓ Default encryption enabled" || echo "✗ Failed to enable encryption"
 
 # Create backend.hcl file in root
 cat > "$BACKEND_HCL" << EOF

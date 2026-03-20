@@ -7,7 +7,8 @@ variable "repositories" {
       name = string
       secrets = optional(list(object({
         name  = string
-        value = string
+        value = optional(string)
+        file  = optional(string)
       })), [])
       variables = optional(list(object({
         name  = string
@@ -16,12 +17,13 @@ variable "repositories" {
     })), [])
     secrets = optional(list(object({
       name  = string
-      value = string
+      value = optional(string)
+      file  = optional(string)
     })), [])
     variables = optional(list(object({
       name  = string
       value = string
-    })), [])    
+    })), [])
   }))
 }
 

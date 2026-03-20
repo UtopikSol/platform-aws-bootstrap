@@ -21,7 +21,7 @@ resource "github_actions_environment_secret" "env_secrets" {
             repo        = repo.name
             environment = env.name
             name        = secret.name
-            value       = secret.value
+            value       = secret.file != null ? file(secret.file) : secret.value
           }
         ]
       ]
@@ -67,7 +67,7 @@ resource "github_actions_secret" "repo_secrets" {
           owner = var.github_org
           repo  = repo.name
           name  = secret.name
-          value = secret.value
+          value = secret.file != null ? file(secret.file) : secret.value
         }
       ]
     ]) : item.key => item
