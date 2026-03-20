@@ -1,0 +1,42 @@
+# Terraform Variables Example
+# Copy to terraform.tfvars and customize with your values
+
+aws_region          = "ca-central-1"
+# github_token is optional - leave empty to use GITHUB_TOKEN environment variable
+# github_token        = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+repositories = [
+  {
+    owner       = "YourOrganization"
+    name        = "platform-aws-bootstrap"
+    permissions = "bootstrap"
+    environments = [
+      {
+      name = "prod"
+      secrets = [
+        {
+          name  = "AWS_ACCOUNT_ID"
+          value = "111111111111"
+        }
+      ]
+      }
+    ]
+  },
+  # Add more repositories as needed:
+  # {
+  #   owner       = "YourOrganization"
+  #   name        = "my-app-repo"
+  #   permissions = "deploy"
+  #   environments = ["dev", "prod"]
+  # },
+  # {
+  #   owner       = "YourOrganization"
+  #   name        = "my-monitoring-repo"
+  #   permissions = "read-only"
+  # },
+]
+
+tags = {
+  Team       = "Platform"
+  CostCenter = "Engineering"
+}

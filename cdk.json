@@ -1,7 +1,0 @@
-{
-  "app": "npx ts-node bin/app.ts",
-  "context": {
-    "availabilityZones:account=ACCOUNT_ID:region=REGION": ["REGION-az1", "REGION-az2", "REGION-az3"]
-  }
-}
-

@@ -1,0 +1,4 @@
+bucket        = "aft-terraform-state-234567890123-ca-central-1"
+key           = "aft/terraform.tfstate"
+region        = "ca-central-1"
+encrypt       = true

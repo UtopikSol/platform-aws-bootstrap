@@ -1,4 +1,4 @@
-name: Deploy Core Bootstrap Stack
+name: Deploy Bootstrap Stack
 
 # This workflow is for updating the bootstrap stack after initial deployment
 # For the FIRST deployment, run manually: npx cdk deploy
@@ -118,7 +118,7 @@ jobs:
           echo "✓ Bootstrap Stack Deployed Successfully"
           echo "========================================"
           echo ""
-          aws cloudformation describe-stacks --stack-name CoreBootstrapStack --query 'Stacks[0].Outputs' --output table || true
+          aws cloudformation describe-stacks --stack-name BootstrapStack --query 'Stacks[0].Outputs' --output table || true
           echo ""
           echo "========================================"
           echo "GitHub OIDC Roles Created"

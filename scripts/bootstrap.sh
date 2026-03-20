@@ -1,14 +1,13 @@
 #!/bin/bash
 
-# AWS CDK Bootstrap Script
-# This script bootstraps the AWS environment for CDK deployments
-# Run this ONCE before your first 'cdk deploy'
+# Terraform AWS Bootstrap Script
+# This script initializes and validates the Terraform configuration
+# Run this before your first 'terraform apply'
 
-# Don't exit on error immediately - we want to handle errors gracefully
-set +e
+set -e
 
 echo "========================================"
-echo "AWS CDK Bootstrap Script"
+echo "Terraform AWS Bootstrap Script"
 echo "========================================"
 echo ""
 
@@ -28,26 +27,72 @@ fi
 
 # Get AWS account ID and region
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-# Default to ca-central-1, can be overridden with AWS_REGION or AWS_DEFAULT_REGION env var
-REGION=${AWS_REGION:-${AWS_DEFAULT_REGION:-ca-central-1}}
+REGION=${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}
 
 echo "✓ AWS Credentials Found"
 echo "  Account ID: $ACCOUNT_ID"
 echo "  Region: $REGION"
 echo ""
-echo "Note: Deploying to $REGION"
-echo ""
 
-# Check if Node.js and CDK are available
-if ! command -v node &> /dev/null; then
-    echo "❌ Node.js is not installed."
+# Check if Terraform is available
+if ! command -v terraform &> /dev/null; then
+    echo "❌ Terraform is not installed."
+    echo "   Install it from: https://www.terraform.io/downloads"
     exit 1
 fi
 
-echo "✓ Node.js is installed"
+echo "✓ Terraform is installed"
+TERRAFORM_VERSION=$(terraform version | head -n 1)
+echo "  Version: $TERRAFORM_VERSION"
 echo ""
 
-# Install CDK CLI if not already installed globally
+# Check terraform version
+TERRAFORM_MAJOR_VERSION=$(terraform version | grep -oP '\d+' | head -n 1)
+if [ "$TERRAFORM_MAJOR_VERSION" -lt 1 ]; then
+    echo "⚠️  Warning: Terraform 1.5+ is recommended (you have version: $TERRAFORM_VERSION)"
+fi
+
+# Check if terraform.tfvars exists
+if [ ! -f "terraform.tfvars" ]; then
+    echo "⚠️  terraform.tfvars not found!"
+    echo "   Copy terraform.tfvars.example to terraform.tfvars and customize:"
+    echo "   cp terraform.tfvars.example terraform.tfvars"
+    echo ""
+    read -p "Continue anyway? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Bootstrap cancelled."
+        exit 1
+    fi
+fi
+
+echo "Initializing Terraform..."
+terraform init
+
+echo ""
+echo "Validating Terraform configuration..."
+terraform validate
+
+if command -v terraform fmt &> /dev/null; then
+    echo ""
+    echo "Checking Terraform code formatting..."
+    if terraform fmt -check -recursive . > /dev/null 2>&1; then
+        echo "✓ Code formatting is valid"
+    else
+        echo "⚠️  Code formatting issues found. Run: terraform fmt -recursive ."
+    fi
+fi
+
+echo ""
+echo "========================================"
+echo "✓ Bootstrap completed successfully!"
+echo "========================================"
+echo ""
+echo "Next steps:"
+echo "  1. Review the plan:       terraform plan"
+echo "  2. Apply configuration:   terraform apply"
+echo ""
+echo "Documentation: https://github.com/UtopikSol/platform-aws-bootstrap/blob/main/README.md"
 if ! command -v cdk &> /dev/null; then
     echo "📦 Installing AWS CDK CLI globally..."
     npm install -g aws-cdk

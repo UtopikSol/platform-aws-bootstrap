@@ -1,25 +1,25 @@
-# Parcel related files
-dist
-.cache
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
 
-# Build
-*.d.ts
-*.js
-*.js.map
-
-# CDK
-cdk.out/
-*.metadata.json
-
-# Misc
-node_modules/
+# IDE
+.vscode/
 .idea/
 *.swp
 *.swo
 *~
+.DS_Store
+
+# Environment
 .env
 .env.local
+.env.*.local
 
-# Environment-specific config (optional - uncomment to ignore)
-# repositories.*.json
-cdk-deploy.log
+# OS
+Thumbs.db
