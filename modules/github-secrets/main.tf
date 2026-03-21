@@ -10,6 +10,25 @@ terraform {
   }
 }
 
+# Create GitHub repository environments first
+resource "github_repository_environment" "environments" {
+  for_each = {
+    for item in flatten([
+      for repo in var.repositories : [
+        for env in repo.environments : {
+          key  = "${var.github_org}/${repo.name}/${env.name}"
+          repo = repo.name
+          name = env.name
+        }
+      ]
+    ]) : item.key => item
+  }
+
+  repository        = each.value.repo
+  environment       = each.value.name
+  can_admins_bypass = false
+}
+
 resource "github_actions_environment_secret" "env_secrets" {
   for_each = {
     for item in flatten([
@@ -32,6 +51,8 @@ resource "github_actions_environment_secret" "env_secrets" {
   environment     = each.value.environment
   secret_name     = each.value.name
   plaintext_value = each.value.value
+
+  depends_on = [github_repository_environment.environments]
 }
 
 resource "github_actions_environment_variable" "env_variables" {
@@ -56,6 +77,8 @@ resource "github_actions_environment_variable" "env_variables" {
   environment   = each.value.environment
   variable_name = each.value.name
   value         = each.value.value
+
+  depends_on = [github_repository_environment.environments]
 }
 
 resource "github_actions_secret" "repo_secrets" {

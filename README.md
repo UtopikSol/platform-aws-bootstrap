@@ -36,16 +36,19 @@ GitHub Actions Workflow
 │   │   ├── main.tf               # OIDC provider configuration
 │   │   ├── variables.tf           # Module input variables
 │   │   └── outputs.tf             # Module outputs
-│   └── github-roles/              # Repository roles module
-│       ├── main.tf                # Role definitions and policies
+│   ├── github-roles/              # Repository roles module
+│   │   ├── main.tf                # Role definitions and policies
+│   │   ├── variables.tf            # Module input variables
+│   │   └── outputs.tf              # Module outputs
+│   └── github-secrets/            # GitHub secrets and variables module
+│       ├── main.tf                # Secrets/variables management
 │       ├── variables.tf            # Module input variables
 │       └── outputs.tf              # Module outputs
 ├── main.tf                        # Root module configuration
 ├── variables.tf                   # Root module variables
 ├── outputs.tf                     # Root module outputs
-├── terraform.tf                   # Terraform provider requirements
 ├── terraform.tfvars.example       # Example terraform variables
-├── repositories.json              # Repository configuration
+├── backend.hcl.example            # Example backend configuration
 └── README.md                      # This file
 ```
 
@@ -85,7 +88,7 @@ GitHub Actions Workflow
 
 ## Permissions Levels
 
-The module supports four permission levels for GitHub repositories:
+The module supports five permission levels for GitHub repositories:
 
 ### `bootstrap`
 Infrastructure/bootstrap management (for infrastructure as code repositories)
@@ -111,6 +114,16 @@ Application deployment (CloudFormation, S3, Lambda, RDS)
 - **No IAM modifications allowed**
 - Use for: Application deployment repos
 
+### `network`
+Network infrastructure management (VPC, subnets, routing, Route53)
+- VPC and subnet creation/management
+- Security group and network ACL operations
+- Internet Gateway, NAT Gateway, VPN Gateway management
+- VPC peering and endpoints
+- Route53 hosted zone management
+- **Limited IAM access for network-specific roles**
+- Use for: Network infrastructure repos
+
 ### `read-only`
 Read-only access for monitoring and reporting
 - CloudWatch metrics and alarms
@@ -123,7 +136,7 @@ Read-only access for monitoring and reporting
 ### Initialize Terraform
 
 ```bash
-terraform init
+terraform init -backend-config=backend.hcl
 ```
 
 ### Plan Deployment
@@ -146,47 +159,42 @@ terraform destroy
 
 ## Configuration
 
-### Repository Configuration (repositories.json)
+### Repository Configuration (terraform.tfvars)
 
-Example structure:
-```json
-{
-  "githubOwner": "UtopikSol",
-  "repositories": [
-    {
-      "owner": "UtopikSol",
-      "name": "my-infrastructure-repo",
-      "permissions": "bootstrap",
-      "environments": ["prod"]
-    },
-    {
-      "owner": "UtopikSol",
-      "name": "my-app-repo",
-      "permissions": "deploy",
-      "environments": ["dev", "staging", "prod"]
-    }
-  ]
-}
-```
-
-### Terraform Variables (terraform.tfvars)
+Define your repositories in the `terraform.tfvars` file. Example structure:
 
 ```hcl
-aws_region = "us-east-1"
-environment = "prod"
+aws_region  = "us-east-1"
+github_org  = "YourGitHubOrg"
+github_token = ""
 
 repositories = [
   {
-    owner       = "YourOrg"
     name        = "repo-name"
     permissions = "deploy"
-    environments = ["prod"]
-  },
+    environments = [
+      {
+        name = "prod"
+        secrets = [
+          {
+            name  = "AWS_ACCOUNT_ID"
+            value = "123456789012"
+          }
+        ]
+        variables = [
+          {
+            name  = "AWS_REGION"
+            value = "us-east-1"
+          }
+        ]
+      }
+    ]
+  }
 ]
 
 tags = {
-  Team       = "Platform"
-  CostCenter = "Engineering"
+  Project   = "GitHub-Bootstrap"
+  ManagedBy = "Terraform"
 }
 ```
 
@@ -303,8 +311,8 @@ terraform import module.github_oidc.aws_iam_openid_connect_provider.github arn:a
 ### Role Not Found in GitHub Actions
 
 Verify:
-1. Repository name matches exactly in `repositories.json`
-2. GitHub organization matches `owner` field
+1. Repository name matches exactly in `terraform.tfvars`
+2. GitHub organization matches `github_org` variable
 3. IAM role exists: `aws iam get-role --role-name github-ORG-REPO`
 4. OIDC provider is configured correctly
 
@@ -357,14 +365,13 @@ terraform state show 'module.github_roles.aws_iam_role.github["my-repo"]'
 
 ### Updating Repositories
 
-Edit `repositories.json` and `terraform.tfvars`:
+Edit `terraform.tfvars` to add, remove, or modify repositories:
 
 ```bash
-# Plan changes
+# Review planned changes
 terraform plan
 
-# Review changes
-# Apply when ready
+# Apply when changes look correct
 terraform apply
 ```
 
@@ -401,192 +408,68 @@ For issues and questions:
 - Documentation: [EXAMPLE_WORKFLOW.md](./docs/EXAMPLE_WORKFLOW.md)
 - Personal GitHub account with organization owner role (for setting secrets)
 
-## Quick Start
+## Getting Started
 
-### Development Environment
+### Prerequisites Setup
 
-This project includes a `.devcontainer` configuration for VS Code. To use it:
+1. **Configure AWS Credentials:**
+   ```bash
+   aws configure
+   ```
 
-1. Install [VS Code Remote - Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-2. Open the workspace in VS Code
-3. Click "Reopen in Container" when prompted
-4. All dependencies will be automatically installed
+2. **Copy example configuration:**
+   ```bash
+   cp terraform.tfvars.example terraform.tfvars
+   cp backend.hcl.example backend.hcl
+   ```
 
-### Initial Setup (First Time Only)
+3. **Edit `terraform.tfvars`** with your GitHub organization and repositories
 
-#### 1. Configure AWS Credentials
+### First Deployment
+
+The first deployment must be run manually (chicken-and-egg: the OIDC role doesn't exist until after the first apply).
 
 ```bash
-aws configure
-# Enter your AWS Access Key ID and Secret Access Key
+terraform init -backend-config=backend.hcl
+terraform plan -out=tfplan
+terraform apply tfplan
 ```
 
-#### 2. Update repositories.json
+This will create:
+- ✓ GitHub OIDC provider in AWS
+- ✓ Repository-specific IAM roles
+- ✓ GitHub environment secrets and variables
+- ✓ SSM Parameter Store exports
 
-Edit [repositories.json](repositories.json) with your repositories and desired permission levels:
+### GitHub Token Configuration
 
-```json
-{
-  "githubOwner": "UtopikSol",
-  "repositories": [
-    {
-      "name": "platform-aws-bootstrap",
-      "permissions": "bootstrap"
-    },
-    {
-      "name": "app-api",
-      "permissions": "deploy"
-    }
-  ]
-}
-```
+The GitHub provider requires a token with `admin:org` scope. Provide it via:
 
-**Permission Levels:**
-- `bootstrap` - Infrastructure/bootstrap management (create roles, OIDC providers)
-- `full` - All AWS permissions (IAM, CloudFormation, S3, etc.)
-- `deploy` - Application deployment (CloudFormation, S3, no IAM creation)
-- `read-only` - Monitor and report (CloudWatch, Logs, no modifications)
-
-#### 3. GitHub Token Configuration
-
-The GitHub token can be provided in multiple ways, depending on your environment:
-
-**Option 1: Environment Variable (Recommended for CI/CD)**
+**Option 1: Environment Variable (Recommended)**
 ```bash
 export GITHUB_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 terraform apply
 ```
 
-**Option 2: Terraform Variable (For Codespaces)**
+**Option 2: Terraform Variable**
 ```hcl
 # In terraform.tfvars
 github_token = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
 **Option 3: GitHub Actions (Automatic)**
-GitHub Actions automatically provides `GITHUB_TOKEN` - no configuration needed:
+GitHub Actions automatically provides `GITHUB_TOKEN`.
 
-```yaml
-- name: Terraform Apply
-  run: terraform apply -auto-approve
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
+## Managing Repositories
 
-**Note:** The token requires `admin:org` scope to manage organization-level resources.
+### Adding a Repository
 
-#### 4. Deploy Terraform
-
-```bash
-terraform init
-terraform plan
-terraform apply
-```
-
-This will:
-- ✓ Create GitHub OIDC provider in AWS
-- ✓ Create repository-specific IAM roles
-- ✓ Set up environment secrets and variables
-- ✓ Configure GitHub Actions integration
-
-### Automated Updates (GitHub Actions)
-
-After initial setup, updates are fully automated:
-
-1. **Modify repositories.json** - Add/remove repositories or change permissions
-2. **Create a Pull Request** - GitHub Actions automatically validates with PR validation workflow
-3. **Merge to main** - Deploy workflow automatically runs when merged
-   - Creates/updates IAM roles for all repositories
-   - Displays stack outputs
-
-
-
-## Configuration
-
-### Repository Configuration
-
-Edit [repositories.json](repositories.json) to manage repositories and their permissions:
-
-```json
-{
-  "githubOwner": "UtopikSol",
-  "repositories": [
-    {
-      "name": "repository-name",
-      "permissions": "deploy"
-    }
-  ]
-}
-```
-
-### Permission Levels Reference
-
-| Level | Use Case | Permissions |
-|-------|----------|---|
-| `bootstrap` | Infrastructure management, bootstrap repos | Full IAM, CloudFormation, S3, OIDC provider management |
-| `full` | Comprehensive infrastructure repos | All AWS permissions |
-| `deploy` | Application deployment repos | CloudFormation, S3, can pass existing IAM roles |
-| `read-only` | Monitoring, reporting, analysis | CloudWatch, Logs, describe operations only |
-
-## Understanding the Architecture
-
-### How It Works
-
-1. **GitHub OIDC Provider** - AWS trusts GitHub's OpenID provider
-2. **Repository-Specific Roles** - Each repo gets its own IAM role
-3. **Dynamic Role ARN Computation** - Workflows compute role ARN from repo name and account ID
-4. **No Long-Lived Credentials** - Uses short-lived OIDC tokens
-
-### Role Naming Convention
-
-```
-arn:aws:iam::ACCOUNT_ID:role/github-OWNER-REPO_NAME
-```
-
-Example: `arn:aws:iam::123456789012:role/github-UtopikSol-platform-aws-bootstrap`
-
-## Project Structure
-
-```
-├── bin/
-│   └── app.ts                    # CDK app entry point
-├── lib/
-│   ├── github-oidc-stack.ts      # OIDC provider configuration
-│   ├── github-roles-stack.ts     # Repository-specific role definitions
-│   └── bootstrap-stack.ts   # Stack composition and orchestration
-├── .devcontainer/
-│   └── devcontainer.json         # Dev container configuration
-├── .github/workflows/
-│   └── deploy-bootstrap.yml      # Automated deployment workflow
-├── .gitattributes
-├── main.tf                       # Main Terraform configuration
-├── variables.tf                  # Terraform variables
-├── outputs.tf                    # Terraform outputs
-├── github-secrets.tf             # GitHub secrets management
-├── terraform.tfvars.example      # Example Terraform variables
-└── README.md                     # This file
-```
-
-## Managing Secrets and Variables
-
-GitHub secrets and environment variables are managed entirely through Terraform:
-
-### Organization Secrets
-Organization-level secrets (e.g., `AWS_ACCOUNT_ID`) are available to all repositories:
-
-```hcl
-# Set in terraform.tfvars
-aws_account_id = "111111111111"
-```
-
-### Environment Secrets and Variables
-Specify secrets and variables per repository/environment in `terraform.tfvars`:
+Edit `terraform.tfvars` and add to the `repositories` list:
 
 ```hcl
 repositories = [
   {
-    owner       = "YourOrg"
-    name        = "your-repo"
+    name        = "my-new-repo"
     permissions = "deploy"
     environments = [
       {
@@ -594,13 +477,7 @@ repositories = [
         secrets = [
           {
             name  = "AWS_ACCOUNT_ID"
-            value = "111111111111"
-          }
-        ]
-        variables = [
-          {
-            name  = "AWS_REGION"
-            value = "us-east-1"
+            value = "123456789012"
           }
         ]
       }
@@ -609,227 +486,58 @@ repositories = [
 ]
 ```
 
-Terraform will automatically create and manage these secrets across your repositories.
-
-## Managed Repositories
-
-Configure repositories and their permissions in `terraform.tfvars`. Terraform manages all OIDC roles and GitHub secrets automatically.
-
-## Role Permissions
-
-Each repository has a dedicated IAM role created by this bootstrap. The role:
-
-- **Only that repository can assume** (scoped via OIDC to `repo:your-org/repo-name:*`)
-- **Has no default permissions** (except assuming other `github-*` roles)
-
-### Adding Permissions to a Role
-
-You must customize each role with the specific permissions it needs. For example:
-
-**For a CDK deployment repo:**
-```typescript
-role.addInlinePolicy(
-  new iam.Policy(this, `CDKDeployPolicy-${repo.name}`, {
-    statements: [
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          'cloudformation:*',
-          'iam:PassRole',
-          's3:GetObject',
-          's3:PutObject',
-        ],
-        resources: ['*'],
-      }),
-    ],
-  })
-);
-```
-
-**For a Terraform repo:**
-```typescript
-role.addInlinePolicy(
-  new iam.Policy(this, `TerraformPolicy-${repo.name}`, {
-    statements: [
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ['ec2:*', 'rds:*', 'vpc:*'],
-        resources: ['*'],
-      }),
-    ],
-  })
-);
-```
-
-Edit the role definitions in [lib/github-roles-stack.ts](lib/github-roles-stack.ts) to add permissions specific to each repository.
-
-## Troubleshooting
-
-### AWS Credentials Not Found
-
-**Error:** `Unable to locate credentials. You can configure credentials by running 'aws login'.`
-
-**Solution:** Configure AWS credentials using:
+Then apply:
 ```bash
-aws configure
+terraform plan -out=tfplan
+terraform apply tfplan
 ```
 
-### Bootstrap Failed - SSM Parameter Not Found
+### Changing Permissions
 
-**Error:** `SSM parameter /cdk-bootstrap/hnb659fds/version not found`
-
-**Solution:** This means AWS CDK hasn't bootstrapped the environment yet. Run:
-```bash
-./bootstrap.sh
-```
-
-It handles all bootstrap steps automatically.
-
-### GitHub Secret Not Set
-
-**Error:** `AWS_ACCOUNT_ID secret not set`
-
-**Solution:** Set the organization secret:
-```bash
-gh auth login
-./set-github-secrets.sh 123456789012
-```
-
-### Permissions Denied on Secret Setup
-
-**Error:** `HTTP 403: Resource not accessible`
-
-**Solution:** Your GitHub account needs to be an organization owner. Contact your organization admin.
-
-## Common Workflows
-
-### Add a New Repository
-
-1. Edit `repositories.json`:
-   ```json
-   {
-     "name": "my-new-repo",
-     "permissions": "deploy"
-   }
-   ```
-
-2. Commit and push to main:
-   ```bash
-   git add repositories.json
-   git commit -m "Add my-new-repo"
-   git push origin main
-   ```
-
-3. GitHub Actions automatically:
-   - Creates the IAM role `github-UtopikSol-my-new-repo`
-   - Makes it assume-able by the `my-new-repo` repository
-
-### Change a Repository's Permissions
-
-1. Edit `repositories.json` and change the `permissions` field
-2. Commit and push - GitHub Actions updates the role permissions automatically
-
-### Deploy Manually Without GitHub Actions
+Edit the `permissions` field in `terraform.tfvars` and apply:
 
 ```bash
-# Update repositories.json first
-nano repositories.json
-
-# Then deploy
-npm run build
-npx cdk deploy --require-approval=never
+terraform plan -out=tfplan
+terraform apply tfplan
 ```
 
-### Verify Role Creation
+### Removing a Repository
+
+Remove the repository from `terraform.tfvars` and apply:
 
 ```bash
-AWS_REGION=ca-central-1 aws iam list-roles | grep github-
+terraform plan -out=tfplan
+terraform apply tfplan
 ```
 
-## Security Best Practices
+## Role Details
 
-1. **Least Privilege** - Assign only the minimum permissions each repo needs
-2. **Audit Changes** - Review all `repositories.json` changes before merge
-3. **Monitor Usage** - Check CloudTrail for OIDC role usage
-4. **Rotate Secrets** - Use short-lived OIDC tokens (15 minutes default)
-5. **Limit Scope** - Roles are scoped to specific repositories via OIDC conditions
+### Role Naming
 
-## Development
-
-### Building the Project
-
-```bash
-npm run build
+Roles follow the naming convention:
+```
+github-{github_org}-{repository_name}
 ```
 
-### Type Checking
+Example: `github-MyOrg-my-repo`
 
-```bash
-npm run build
+### Assuming Roles in GitHub Actions
+
+Use the `aws-actions/configure-aws-credentials` action:
+
+```yaml
+- name: Configure AWS Credentials
+  uses: aws-actions/configure-aws-credentials@v4
+  with:
+    role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-${{ github.repository_owner }}-${{ github.event.repository.name }}
+    aws-region: us-east-1
 ```
-
-### Synthesizing CDK
-
-```bash
-npx cdk synth
-```
-
-### Running Tests
-
-```bash
-npm test
-```
-
-## Support
-
-For issues or questions:
-1. Check the [Troubleshooting](#troubleshooting) section
-2. Review [AWS CDK documentation](https://docs.aws.amazon.com/cdk/)
-3. Check [GitHub OIDC documentation](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect)
-      },
-      "Action": "sts:AssumeRoleWithWebIdentity",
-      "Condition": {
-        "StringEquals": {
-          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
-        },
-        "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:MyOrg/REPOSITORY_NAME:*"
-        }
-      }
-    }
-  ]
-}
-```
-
-## CDK Commands
-
-```bash
-# Build TypeScript
-npm run build
-
-# Watch TypeScript for changes
-npm run watch
-
-# Synthesize the CDK app (generates CloudFormation)
-npm run synth
-
-# Deploy to AWS
-npm run deploy
-
-# Destroy the stack
-npm run destroy
-
-# Compare with deployed version
-npm run cdk -- diff
-```
-
-
 
 ## References
 
-- [AWS CDK Documentation](https://docs.aws.amazon.com/cdk/v2/guide/)
-- [GitHub OIDC with AWS](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect)
-- [GitHub OIDC AWS Documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc.html)
+- [GitHub OIDC Documentation](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect)
+- [AWS IAM OIDC Provider](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc.html)
+- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
 
 ## License
 

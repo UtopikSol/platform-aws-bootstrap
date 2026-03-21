@@ -38,7 +38,8 @@ variable "repositories" {
       name = string
       secrets = optional(list(object({
         name  = string
-        value = string
+        value = optional(string)
+        file  = optional(string)
       })), [])
       variables = optional(list(object({
         name  = string
@@ -47,7 +48,8 @@ variable "repositories" {
     })), [])
     secrets = optional(list(object({
       name  = string
-      value = string
+      value = optional(string)
+      file  = optional(string)
     })), [])
     variables = optional(list(object({
       name  = string
@@ -58,9 +60,9 @@ variable "repositories" {
   validation {
     condition = alltrue([
       for repo in var.repositories :
-      contains(["bootstrap", "full", "deploy", "read-only"], repo.permissions)
+      contains(["bootstrap", "full", "deploy", "network", "read-only"], repo.permissions)
     ])
-    error_message = "All permissions must be one of: bootstrap, full, deploy, read-only"
+    error_message = "All permissions must be one of: bootstrap, full, deploy, network, read-only"
   }
 }
 

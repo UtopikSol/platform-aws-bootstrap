@@ -1,40 +1,84 @@
 # Terraform Variables Example
 # Copy to terraform.tfvars and customize with your values
+# 
+# IMPORTANT: 
+# 1. Keep sensitive values (tokens, keys) out of version control
+# 2. Store this file as TFVARS secret in GitHub: gh secret set TFVARS < terraform.tfvars
+# 3. Use environment variables for sensitive data when possible
 
-aws_region          = "ca-central-1"
-github_org          = "YourOrganization"
-# github_token is optional - leave empty to use GITHUB_TOKEN environment variable
-# github_token        = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# ============================================================================
+# AWS CONFIGURATION
+# ============================================================================
+aws_region = "ca-central-1"  # AWS region where resources will be created
+
+# ============================================================================
+# GITHUB CONFIGURATION
+# ============================================================================
+github_org = "YourOrganization"  # GitHub organization name
+
+# GitHub token - OPTIONAL
+# Leave empty to use GITHUB_TOKEN environment variable
+# Create token at: https://github.com/settings/tokens (Personal Access Token)
+# Scopes needed: repo, workflow, admin:org_hook, admin:repo_hook
+# github_token = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# ============================================================================
+# REPOSITORIES CONFIGURATION
+# ============================================================================
+# IMPORTANT: This defines which repositories get GitHub Actions OIDC roles
+# and secrets. Structure your repositories by purpose/environment.
 
 repositories = [
+  # ========================================================================
+  # BOOTSTRAP REPOSITORY (Platform Admin)
+  # ========================================================================
   {
     name        = "platform-aws-bootstrap"
+    description = "Infrastructure bootstrap and AWS account setup"
     permissions = "bootstrap"
-    environments = [
+  
+    ## 
+    # secrets = [
+    #   # AWS_ACCOUNT_ID is needed for GitHub Actions workflows to know which account to target
+    #   {
+    #     name  = "AWS_ACCOUNT_ID"
+    #     value = "123456789012"
+    #   },
+    #   # Save that file to GitHub Actions secrets to be used in workflows or
+    #   # be restored in the repository for local development.
+    #   {
+    #     name = "TERRAFORM_TFVARS_FILE"
+    #     file = "terraform.tfvars"
+    #   }
+    # ]
+  },
+
+  # ========================================================================
+  # NETWORK REPOSITORY (Platform Admin)
+  # ========================================================================
+  {
+    name        = "platform-aws-network"
+    description = "Network infrastructure setup"
+    permissions = "network"
+  
+    secrets = [
       {
-      name = "production"
-      secrets = [
-        {
-          name  = "AWS_ACCOUNT_ID"
-          value = "111111111111"
-        }
-      ]
-      }
+        name  = "AWS_ACCOUNT_ID"
+        value = "111111111111"
+      },
     ]
   },
-  # Add more repositories as needed:
-  # {
-  #   name        = "my-app-repo"
-  #   permissions = "deploy"
-  #   environments = ["dev", "prod"]
-  # },
-  # {
-  #   name        = "my-monitoring-repo"
-  #   permissions = "read-only"
-  # },
 ]
 
+# ============================================================================
+# TAGGING STRATEGY
+# ============================================================================
+# Tags applied to all resources created by this Terraform configuration
+# These help with cost allocation, automation, and organization
+
 tags = {
-  Team       = "Platform"
-  CostCenter = "Engineering"
+  GitRepo     = "platform-aws-bootstrap"
+  ManagedBy   = "terraform"
+  Project     = "bootstrap"
+  Team        = "platform"
 }
