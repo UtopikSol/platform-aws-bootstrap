@@ -145,8 +145,8 @@ else
     if ! git rev-parse --git-dir > /dev/null 2>&1; then
         echo "Not in a git repository. Will create default terraform.tfvars from template."
     else
-        # Try to get repository name
-        REPO=$(git config --get remote.origin.url | sed 's/.*[:/]\([^/]*\)\/\([^/]*\)\.git$/\1\/\2/')
+        # Try to get repository information
+        REPO=$(git config --get remote.origin.url | sed -E 's|.*[:/]([^/]+)/([^/]+?)(\.git)?$|\1/\2|')
         if [ -z "$REPO" ]; then
             echo "Could not determine repository name. Will create default terraform.tfvars from template."
         else
@@ -172,7 +172,22 @@ if [ "$RESTORATION_SUCCESSFUL" = false ]; then
     
     if [ -f "${PROJECT_ROOT}/terraform.tfvars.example" ]; then
         cp "${PROJECT_ROOT}/terraform.tfvars.example" "$TFVARS_FILE"
-        echo -e "${GREEN}✓ Created $TFVARS_FILE from template${NC}"
+        
+        # Extract GitHub organization from repository URL and replace YourOrganization
+        if [ -n "$REPO" ]; then
+            GITHUB_ORG=$(echo "$REPO" | sed -E 's|([^/]+)/.*|\1|')
+            if [ -n "$GITHUB_ORG" ] && [ "$GITHUB_ORG" != "$REPO" ]; then
+                sed -i "s/YourOrganization/$GITHUB_ORG/g" "$TFVARS_FILE"
+                echo -e "${GREEN}✓ Created $TFVARS_FILE from template${NC}"
+                echo -e "${GREEN}✓ Updated github_org to: $GITHUB_ORG${NC}"
+            else
+                echo -e "${GREEN}✓ Created $TFVARS_FILE from template${NC}"
+                echo -e "${YELLOW}⚠ Could not parse GitHub organization from: $REPO${NC}"
+            fi
+        else
+            echo -e "${GREEN}✓ Created $TFVARS_FILE from template${NC}"
+            echo -e "${YELLOW}⚠ Could not detect GitHub organization${NC}"
+        fi
     else
         # Create minimal terraform.tfvars if no template exists
         cat > "$TFVARS_FILE" << 'EOF'
@@ -186,7 +201,7 @@ EOF
         echo -e "${GREEN}✓ Created default $TFVARS_FILE${NC}"
     fi
     
-    echo -e "${YELLOW}⚠ Please edit terraform.tfvars with your configuration${NC}"
+    echo -e "${YELLOW}⚠ Please review terraform.tfvars and verify the configuration${NC}"
 fi
 
 echo ""

@@ -37,37 +37,30 @@ repositories = [
     description = "Infrastructure bootstrap and AWS account setup"
     permissions = "bootstrap"
   
-    ## 
-    # secrets = [
-    #   # AWS_ACCOUNT_ID is needed for GitHub Actions workflows to know which account to target
-    #   {
-    #     name  = "AWS_ACCOUNT_ID"
-    #     value = "123456789012"
-    #   },
-    #   # Save that file to GitHub Actions secrets to be used in workflows or
-    #   # be restored in the repository for local development.
-    #   {
-    #     name = "TERRAFORM_TFVARS_FILE"
-    #     file = "terraform.tfvars"
-    #   }
-    # ]
+    secrets = [
+      # AWS_ACCOUNT_ID is needed for GitHub Actions workflows to know which account to target
+      {
+        name  = "AWS_ACCOUNT_ID"
+        value = "123456789012"
+      },
+    ]
   },
 
   # ========================================================================
   # NETWORK REPOSITORY (Platform Admin)
   # ========================================================================
-  {
-    name        = "platform-aws-network"
-    description = "Network infrastructure setup"
-    permissions = "network"
-  
-    secrets = [
-      {
-        name  = "AWS_ACCOUNT_ID"
-        value = "111111111111"
-      },
-    ]
-  },
+  # {
+  #   name        = "platform-aws-network"
+  #   description = "Network infrastructure setup"
+  #   permissions = "network"
+  # 
+  #   secrets = [
+  #     {
+  #       name  = "AWS_ACCOUNT_ID"
+  #       value = "111111111111"
+  #     },
+  #   ]
+  # },
 ]
 
 # ============================================================================
